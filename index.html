@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSI Indicator — Demo</title>
+<style>
+  :root {
+    --bg: #131722; --panel: #1a1e29; --grid: #232733; --text: #d1d4dc;
+    --muted: #787b86; --up: #26a69a; --down: #ef5350; --rsi: #7e57c2;
+    --ma: #ff9800; --bb: #2962ff; --ob: #ef5350; --os: #26a69a; --accent: #2962ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.4 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 10px 16px;
+    border-bottom: 1px solid var(--grid); background: var(--panel); }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .sym { color: var(--muted); font-size: 12px; }
+  header .badge { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .wrap { padding: 12px 16px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+    padding: 10px 12px; background: var(--panel); border: 1px solid var(--grid);
+    border-radius: 6px; margin-bottom: 12px; }
+  .controls label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+  .controls input[type="number"], .controls select {
+    background: #131722; color: var(--text); border: 1px solid var(--grid);
+    border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+  .controls input[type="number"] { width: 56px; }
+  .controls input[type="checkbox"] { accent-color: var(--accent); }
+  canvas { display: block; width: 100%; background: var(--bg);
+    border: 1px solid var(--grid); border-radius: 6px; }
+  .legend { display: flex; gap: 16px; margin: 8px 2px 0; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .legend span::before { content: ""; display: inline-block; width: 18px; height: 3px;
+    border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .lg-rsi::before { background: var(--rsi); }
+  .lg-ma::before { background: var(--ma); }
+  .lg-bb::before { background: var(--bb); }
+  .lg-ob::before { background: var(--ob); }
+  .lg-os::before { background: var(--os); }
+  .readout { margin-left: auto; color: var(--text); }
+</style>
+</head>
+<body>
+<header>
+  <h1>RSI Indicator</h1>
+  <span class="sym">EUR/USD · 1H · demo data</span>
+  <span class="badge">TradingView-accurate · Wilder RMA smoothing</span>
+</header>
+<div class="wrap">
+  <div class="controls">
+    <label>Length <input id="length" type="number" value="14" min="1" /></label>
+    <label>Source
+      <select id="source">
+        <option value="close" selected>close</option>
+        <option value="open">open</option>
+        <option value="high">high</option>
+        <option value="low">low</option>
+        <option value="hl2">hl2</option>
+        <option value="hlc3">hlc3</option>
+        <option value="ohlc4">ohlc4</option>
+      </select>
+    </label>
+    <label>MA type
+      <select id="maType">
+        <option value="None">None</option>
+        <option value="SMA" selected>SMA</option>
+        <option value="EMA">EMA</option>
+        <option value="WMA">WMA</option>
+        <option value="RMA">RMA</option>
+        <option value="SMA + Bollinger Bands">SMA + Bollinger Bands</option>
+      </select>
+    </label>
+    <label>MA len <input id="maLength" type="number" value="14" min="1" /></label>
+    <label>BB mult <input id="bbMult" type="number" value="2" step="0.1" min="0.1" /></label>
+    <label>OB <input id="overbought" type="number" value="70" /></label>
+    <label>OS <input id="oversold" type="number" value="30" /></label>
+    <label><input id="showDivergence" type="checkbox" checked /> Divergence</label>
+    <span class="readout" id="readout"></span>
+  </div>
+
+  <canvas id="price" height="360"></canvas>
+  <canvas id="rsi" height="220" style="margin-top:8px"></canvas>
+
+  <div class="legend">
+    <span class="lg-rsi">RSI</span>
+    <span class="lg-ma">RSI-based MA</span>
+    <span class="lg-bb">Bollinger Bands</span>
+    <span class="lg-ob">Overbought</span>
+    <span class="lg-os">Oversold</span>
+  </div>
+</div>
+
+<script src="rsi.js"></script>
+<script src="data.js"></script>
+<script>
+(function () {
+  const bars = window.DEMO_BARS;
+  const priceCv = document.getElementById('price');
+  const rsiCv = document.getElementById('rsi');
+  const css = getComputedStyle(document.documentElement);
+  const C = (n) => css.getPropertyValue(n).trim();
+
+  const controls = ['length','source','maType','maLength','bbMult','overbought','oversold','showDivergence'];
+  controls.forEach(id => document.getElementById(id).addEventListener('input', render));
+
+  function readOpts() {
+    return {
+      length: +document.getElementById('length').value,
+      source: document.getElementById('source').value,
+      maType: document.getElementById('maType').value,
+      maLength: +document.getElementById('maLength').value,
+      bbMult: +document.getElementById('bbMult').value,
+      overbought: +document.getElementById('overbought').value,
+      oversold: +document.getElementById('oversold').value,
+      middle: 50,
+      showDivergence: document.getElementById('showDivergence').checked,
+    };
+  }
+
+  function fit(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || cv.parentElement.clientWidth;
+    const h = cv.height;
+    cv.width = w * dpr; cv.height = h * dpr;
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w, h };
+  }
+
+  function render() {
+    const opts = readOpts();
+    const res = RSI.calculate(bars, opts);
+    drawPrice(res, opts);
+    drawRSI(res, opts);
+    const last = res.rsi.filter(v => !isNaN(v)).slice(-1)[0];
+    document.getElementById('readout').textContent =
+      'RSI(' + opts.length + ') = ' + (last != null ? last.toFixed(2) : '—');
+  }
+
+  const PADL = 8, PADR = 54, PADT = 12, PADB = 18;
+
+  function drawPrice(res, opts) {
+    const { ctx, w, h } = fit(priceCv);
+    ctx.clearRect(0, 0, w, h);
+    const n = bars.length;
+    let hi = -Infinity, lo = Infinity;
+    for (const b of bars) { if (b.high > hi) hi = b.high; if (b.low < lo) lo = b.low; }
+    const pad = (hi - lo) * 0.06; hi += pad; lo -= pad;
+    const x = i => PADL + (i + 0.5) * (w - PADL - PADR) / n;
+    const y = v => PADT + (hi - v) / (hi - lo) * (h - PADT - PADB);
+
+    grid(ctx, w, h, hi, lo, y, v => v.toFixed(4));
+    const cw = Math.max(1.5, (w - PADL - PADR) / n * 0.6);
+    for (let i = 0; i < n; i++) {
+      const b = bars[i]; const up = b.close >= b.open;
+      ctx.strokeStyle = ctx.fillStyle = up ? C('--up') : C('--down');
+      ctx.beginPath(); ctx.moveTo(x(i), y(b.high)); ctx.lineTo(x(i), y(b.low)); ctx.stroke();
+      const yo = y(b.open), yc = y(b.close);
+      ctx.fillRect(x(i) - cw / 2, Math.min(yo, yc), cw, Math.max(1, Math.abs(yc - yo)));
+    }
+    // divergence markers on price lows/highs
+    if (opts.showDivergence) {
+      drawDivLines(ctx, res.divergences.bullish, x, i => y(bars[i].low), C('--os'));
+      drawDivLines(ctx, res.divergences.bearish, x, i => y(bars[i].high), C('--ob'));
+    }
+  }
+
+  function drawRSI(res, opts) {
+    const { ctx, w, h } = fit(rsiCv);
+    ctx.clearRect(0, 0, w, h);
+    const n = bars.length;
+    const hi = 100, lo = 0;
+    const x = i => PADL + (i + 0.5) * (w - PADL - PADR) / n;
+    const y = v => PADT + (hi - v) / (hi - lo) * (h - PADT - PADB);
+
+    // OB/OS shaded zone + fill
+    const yOB = y(opts.overbought), yOS = y(opts.oversold);
+    ctx.fillStyle = 'rgba(120,124,134,0.06)';
+    ctx.fillRect(PADL, yOB, w - PADL - PADR, yOS - yOB);
+
+    // horizontal levels
+    hline(ctx, w, y(opts.overbought), C('--ob'), opts.overbought);
+    hline(ctx, w, y(50), C('--grid'), 50, true);
+    hline(ctx, w, y(opts.oversold), C('--os'), opts.oversold);
+
+    // Bollinger Bands fill
+    if (res.bbUpper) {
+      band(ctx, res.bbUpper, res.bbLower, x, y, 'rgba(41,98,255,0.10)');
+      line(ctx, res.bbUpper, x, y, C('--bb'), 1);
+      line(ctx, res.bbLower, x, y, C('--bb'), 1);
+    }
+    // RSI-based MA
+    if (res.ma) line(ctx, res.ma, x, y, C('--ma'), 1.5);
+    // RSI line
+    line(ctx, res.rsi, x, y, C('--rsi'), 1.75);
+
+    // right-axis labels
+    axisLabels(ctx, w, [ [opts.overbought, C('--ob')], [50, C('--muted')], [opts.oversold, C('--os')] ], y);
+
+    if (opts.showDivergence) {
+      drawDivLines(ctx, res.divergences.bullish, x, i => y(res.rsi[i]), C('--os'));
+      drawDivLines(ctx, res.divergences.bearish, x, i => y(res.rsi[i]), C('--ob'));
+    }
+  }
+
+  function grid(ctx, w, h, hi, lo, y, fmt) {
+    ctx.strokeStyle = C('--grid'); ctx.fillStyle = C('--muted');
+    ctx.lineWidth = 1; ctx.font = '10px sans-serif'; ctx.textBaseline = 'middle';
+    const steps = 5;
+    for (let s = 0; s <= steps; s++) {
+      const v = lo + (hi - lo) * s / steps; const yy = y(v);
+      ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(PADL, yy); ctx.lineTo(w - PADR, yy); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillText(fmt(v), w - PADR + 5, yy);
+    }
+  }
+  function hline(ctx, w, yy, color, label, dashed) {
+    ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = 0.55;
+    if (dashed) ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(PADL, yy); ctx.lineTo(w - PADR, yy); ctx.stroke(); ctx.restore();
+  }
+  function axisLabels(ctx, w, pairs, y) {
+    ctx.font = '10px sans-serif'; ctx.textBaseline = 'middle';
+    for (const [v, color] of pairs) { ctx.fillStyle = color; ctx.fillText(String(v), w - PADR + 5, y(v)); }
+  }
+  function line(ctx, arr, x, y, color, lw) {
+    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < arr.length; i++) {
+      if (isNaN(arr[i])) { started = false; continue; }
+      const px = x(i), py = y(arr[i]);
+      if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  function band(ctx, up, dn, x, y, fill) {
+    ctx.fillStyle = fill; ctx.beginPath(); let started = false;
+    for (let i = 0; i < up.length; i++) { if (isNaN(up[i])) continue;
+      const px = x(i), py = y(up[i]); if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py); }
+    for (let i = dn.length - 1; i >= 0; i--) { if (isNaN(dn[i])) continue; ctx.lineTo(x(i), y(dn[i])); }
+    ctx.closePath(); ctx.fill();
+  }
+  function drawDivLines(ctx, list, x, yOf, color) {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([4, 2]);
+    for (const d of list) {
+      ctx.beginPath(); ctx.moveTo(x(d.from), yOf(d.from)); ctx.lineTo(x(d.to), yOf(d.to)); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(x(d.to), yOf(d.to), 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.setLineDash([4, 2]);
+    }
+    ctx.restore();
+  }
+
+  window.addEventListener('resize', render);
+  render();
+})();
+</script>
+</body>
+</html>
