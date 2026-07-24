@@ -130,14 +130,13 @@
   }
 
   function movingAverage(type, src, len, volume) {
-    switch ((type || 'SMA').toUpperCase()) {
-      case 'SMA': return smaWindow(src, len);
-      case 'EMA': return ema(src, len);
-      case 'WMA': return wma(src, len);
-      case 'VWMA': return vwma(src, volume, len);
-      case 'RMA': return rma(src, len);
-      default: return smaWindow(src, len);
-    }
+    // Normalise TradingView's exact labels (e.g. "SMMA (RMA)") to a smoother.
+    const t = (type || 'SMA').toUpperCase();
+    if (t.indexOf('SMMA') >= 0 || t === 'RMA') return rma(src, len);
+    if (t.indexOf('EMA') >= 0) return ema(src, len);
+    if (t.indexOf('VWMA') >= 0) return vwma(src, volume, len);
+    if (t.indexOf('WMA') >= 0) return wma(src, len);
+    return smaWindow(src, len); // SMA and "SMA + Bollinger Bands"
   }
 
   // ---- core RSI (matches Pine ta.rsi exactly) ----
@@ -270,6 +269,7 @@
         case 'hl2': return (b.high + b.low) / 2;
         case 'hlc3': return (b.high + b.low + b.close) / 3;
         case 'ohlc4': return (b.open + b.high + b.low + b.close) / 4;
+        case 'hlcc4': return (b.high + b.low + b.close + b.close) / 4;
         default: return b.close;
       }
     });

@@ -3,257 +3,242 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>RSI Indicator — Demo</title>
+<title>RSI Indicator — TradingView-style settings</title>
 <style>
   :root {
-    --bg: #131722; --panel: #1a1e29; --grid: #232733; --text: #d1d4dc;
-    --muted: #787b86; --up: #26a69a; --down: #ef5350; --rsi: #7e57c2;
-    --ma: #ff9800; --bb: #2962ff; --ob: #ef5350; --os: #26a69a; --accent: #2962ff;
+    --bg:#131722; --panel:#1a1e29; --panel2:#1e222d; --grid:#2a2e39; --text:#d1d4dc;
+    --muted:#787b86; --up:#26a69a; --down:#ef5350; --accent:#2962ff; --border:#363a45;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-    font: 13px/1.4 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-  header { display: flex; align-items: center; gap: 16px; padding: 10px 16px;
-    border-bottom: 1px solid var(--grid); background: var(--panel); }
-  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
-  header .sym { color: var(--muted); font-size: 12px; }
-  header .badge { margin-left: auto; font-size: 11px; color: var(--muted); }
-  .wrap { padding: 12px 16px; }
-  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
-    padding: 10px 12px; background: var(--panel); border: 1px solid var(--grid);
-    border-radius: 6px; margin-bottom: 12px; }
-  .controls label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
-  .controls input[type="number"], .controls select {
-    background: #131722; color: var(--text); border: 1px solid var(--grid);
-    border-radius: 4px; padding: 4px 6px; font-size: 12px; }
-  .controls input[type="number"] { width: 56px; }
-  .controls input[type="checkbox"] { accent-color: var(--accent); }
-  canvas { display: block; width: 100%; background: var(--bg);
-    border: 1px solid var(--grid); border-radius: 6px; }
-  .legend { display: flex; gap: 16px; margin: 8px 2px 0; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
-  .legend span::before { content: ""; display: inline-block; width: 18px; height: 3px;
-    border-radius: 2px; margin-right: 6px; vertical-align: middle; }
-  .lg-rsi::before { background: var(--rsi); }
-  .lg-ma::before { background: var(--ma); }
-  .lg-bb::before { background: var(--bb); }
-  .lg-ob::before { background: var(--ob); }
-  .lg-os::before { background: var(--os); }
-  .readout { margin-left: auto; color: var(--text); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font:13px/1.4 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:9px 16px;
+    border-bottom:1px solid var(--grid); background:var(--panel); }
+  header h1 { font-size:14px; margin:0; font-weight:600; }
+  header .sym { color:var(--muted); font-size:12px; }
+  header .badge { margin-left:auto; font-size:11px; color:var(--muted); }
+  .wrap { padding:12px 16px; }
+  .statusline { display:flex; align-items:center; gap:14px; padding:6px 4px 10px;
+    font-size:12px; color:var(--muted); }
+  .statusline .title { color:var(--text); font-weight:600; }
+  .statusline .val { font-variant-numeric:tabular-nums; }
+  .gear { margin-left:auto; cursor:pointer; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); border-radius:5px; padding:5px 10px;
+    font-size:12px; display:inline-flex; align-items:center; gap:6px; }
+  .gear:hover { border-color:var(--accent); }
+  canvas { display:block; width:100%; background:var(--bg);
+    border:1px solid var(--grid); border-radius:6px; }
+  .legend { display:flex; gap:16px; margin:8px 2px 0; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+
+  /* ---- settings modal ---- */
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none;
+    align-items:center; justify-content:center; z-index:50; }
+  .overlay.open { display:flex; }
+  .dialog { width:560px; max-width:94vw; max-height:88vh; background:var(--panel);
+    border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column;
+    box-shadow:0 12px 48px rgba(0,0,0,0.5); overflow:hidden; }
+  .dialog .dhead { display:flex; align-items:center; padding:12px 16px; border-bottom:1px solid var(--grid); }
+  .dialog .dhead .name { font-size:15px; font-weight:600; }
+  .dialog .dhead .x { margin-left:auto; cursor:pointer; color:var(--muted); font-size:18px; line-height:1; }
+  .tabs { display:flex; gap:2px; padding:0 12px; border-bottom:1px solid var(--grid); }
+  .tabs button { background:none; border:none; color:var(--muted); padding:11px 14px;
+    font-size:13px; cursor:pointer; border-bottom:2px solid transparent; }
+  .tabs button.active { color:var(--text); border-bottom-color:var(--accent); }
+  .tabbody { padding:14px 18px; overflow:auto; }
+  .tabpane { display:none; }
+  .tabpane.active { display:block; }
+  .row { display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px;
+    padding:7px 0; border-bottom:1px solid rgba(54,58,69,0.4); }
+  .row:last-child { border-bottom:none; }
+  .row .lbl { color:var(--text); font-size:13px; display:flex; align-items:center; gap:8px; }
+  .row .ctl { display:flex; align-items:center; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+  .sechead { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted);
+    margin:14px 0 4px; font-weight:600; }
+  input[type="number"], select, input[type="text"] {
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:4px; padding:5px 7px; font-size:12px; }
+  input[type="number"] { width:64px; }
+  select { min-width:120px; }
+  input[type="checkbox"] { width:15px; height:15px; accent-color:var(--accent); }
+  input[type="color"] { width:28px; height:24px; padding:0; border:1px solid var(--border);
+    border-radius:4px; background:none; cursor:pointer; }
+  .lw { width:56px; }
+  .opac { width:120px; }
+  .dfoot { display:flex; align-items:center; gap:8px; padding:12px 16px; border-top:1px solid var(--grid); }
+  .dfoot .spacer { flex:1; }
+  .btn { border:1px solid var(--border); background:var(--panel2); color:var(--text);
+    border-radius:5px; padding:7px 16px; font-size:13px; cursor:pointer; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn:hover { filter:brightness(1.1); }
+  .muted { color:var(--muted); font-size:12px; }
+  .disabledRow { opacity:.45; }
 </style>
 </head>
 <body>
 <header>
   <h1>RSI Indicator</h1>
   <span class="sym">EUR/USD · 1H · demo data</span>
-  <span class="badge">TradingView-accurate · Wilder RMA smoothing</span>
+  <span class="badge">TradingView-accurate · Inputs / Style / Visibility fully wired</span>
 </header>
+
 <div class="wrap">
-  <div class="controls">
-    <label>Length <input id="length" type="number" value="14" min="1" /></label>
-    <label>Source
-      <select id="source">
-        <option value="close" selected>close</option>
-        <option value="open">open</option>
-        <option value="high">high</option>
-        <option value="low">low</option>
-        <option value="hl2">hl2</option>
-        <option value="hlc3">hlc3</option>
-        <option value="ohlc4">ohlc4</option>
-      </select>
-    </label>
-    <label>MA type
-      <select id="maType">
-        <option value="None">None</option>
-        <option value="SMA" selected>SMA</option>
-        <option value="EMA">EMA</option>
-        <option value="WMA">WMA</option>
-        <option value="RMA">RMA</option>
-        <option value="SMA + Bollinger Bands">SMA + Bollinger Bands</option>
-      </select>
-    </label>
-    <label>MA len <input id="maLength" type="number" value="14" min="1" /></label>
-    <label>BB mult <input id="bbMult" type="number" value="2" step="0.1" min="0.1" /></label>
-    <label>OB <input id="overbought" type="number" value="70" /></label>
-    <label>OS <input id="oversold" type="number" value="30" /></label>
-    <label><input id="showDivergence" type="checkbox" checked /> Divergence</label>
-    <span class="readout" id="readout"></span>
+  <div class="statusline" id="statusline">
+    <span class="title">RSI</span>
+    <span id="statusParams" class="muted"></span>
+    <span id="statusValues" class="val"></span>
+    <button class="gear" id="openSettings">⚙ Settings</button>
   </div>
 
-  <canvas id="price" height="360"></canvas>
+  <canvas id="price" height="340"></canvas>
   <canvas id="rsi" height="220" style="margin-top:8px"></canvas>
 
-  <div class="legend">
-    <span class="lg-rsi">RSI</span>
-    <span class="lg-ma">RSI-based MA</span>
-    <span class="lg-bb">Bollinger Bands</span>
-    <span class="lg-ob">Overbought</span>
-    <span class="lg-os">Oversold</span>
+  <div class="legend" id="legend"></div>
+</div>
+
+<!-- ===== Settings dialog (mirrors TradingView's RSI settings) ===== -->
+<div class="overlay" id="overlay">
+  <div class="dialog">
+    <div class="dhead">
+      <span class="name">RSI</span>
+      <span class="x" id="closeX">✕</span>
+    </div>
+    <div class="tabs">
+      <button data-tab="inputs" class="active">Inputs</button>
+      <button data-tab="style">Style</button>
+      <button data-tab="visibility">Visibility</button>
+    </div>
+    <div class="tabbody">
+      <!-- INPUTS -->
+      <div class="tabpane active" data-pane="inputs">
+        <div class="row"><span class="lbl">Length</span>
+          <span class="ctl"><input type="number" id="i_length" min="1"></span></div>
+        <div class="row"><span class="lbl">Source</span>
+          <span class="ctl"><select id="i_source">
+            <option value="open">open</option><option value="high">high</option>
+            <option value="low">low</option><option value="close">close</option>
+            <option value="hl2">hl2</option><option value="hlc3">hlc3</option>
+            <option value="ohlc4">ohlc4</option><option value="hlcc4">hlcc4</option>
+          </select></span></div>
+        <div class="row"><span class="lbl"><input type="checkbox" id="i_calcDiv">Calculate Divergence</span>
+          <span class="ctl"></span></div>
+
+        <div class="sechead">Smoothing</div>
+        <div class="row"><span class="lbl">MA Type</span>
+          <span class="ctl"><select id="i_maType">
+            <option>None</option><option>SMA</option>
+            <option>SMA + Bollinger Bands</option><option>EMA</option>
+            <option>SMMA (RMA)</option><option>WMA</option><option>VWMA</option>
+          </select></span></div>
+        <div class="row"><span class="lbl">MA Length</span>
+          <span class="ctl"><input type="number" id="i_maLength" min="1"></span></div>
+        <div class="row"><span class="lbl">BB StdDev</span>
+          <span class="ctl"><input type="number" id="i_bbStdDev" min="0.1" step="0.1"></span></div>
+
+        <div class="sechead">Calculation</div>
+        <div class="row"><span class="lbl">Timeframe</span>
+          <span class="ctl"><select id="i_timeframe">
+            <option value="">Chart</option><option value="1">1 minute</option>
+            <option value="5">5 minutes</option><option value="15">15 minutes</option>
+            <option value="60">1 hour</option><option value="240">4 hours</option>
+            <option value="1D">1 day</option>
+          </select></span></div>
+        <div class="row"><span class="lbl"><input type="checkbox" id="i_waitClose">Wait for timeframe closes</span>
+          <span class="ctl"></span></div>
+      </div>
+
+      <!-- STYLE -->
+      <div class="tabpane" data-pane="style">
+        <div class="row" data-plot="rsi">
+          <span class="lbl"><input type="checkbox" data-vis="rsi">RSI</span>
+          <span class="ctl">
+            <input type="color" data-color="rsi">
+            <select class="lw" data-width="rsi"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+            <select data-style="rsi"><option value="solid">──</option><option value="dashed">– –</option><option value="dotted">···</option></select>
+          </span>
+        </div>
+        <div class="row" data-plot="ma">
+          <span class="lbl"><input type="checkbox" data-vis="ma">RSI-based MA</span>
+          <span class="ctl">
+            <input type="color" data-color="ma">
+            <select class="lw" data-width="ma"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+            <select data-style="ma"><option value="solid">──</option><option value="dashed">– –</option><option value="dotted">···</option></select>
+          </span>
+        </div>
+
+        <div class="sechead">Bands</div>
+        <div class="row" data-plot="upperBand">
+          <span class="lbl"><input type="checkbox" data-vis="upperBand">Upper Band</span>
+          <span class="ctl">
+            <input type="number" data-value="upperBand">
+            <input type="color" data-color="upperBand">
+            <select class="lw" data-width="upperBand"><option>1</option><option>2</option><option>3</option></select>
+            <select data-style="upperBand"><option value="solid">──</option><option value="dashed">– –</option><option value="dotted">···</option></select>
+          </span>
+        </div>
+        <div class="row" data-plot="middleBand">
+          <span class="lbl"><input type="checkbox" data-vis="middleBand">Middle Band</span>
+          <span class="ctl">
+            <input type="number" data-value="middleBand">
+            <input type="color" data-color="middleBand">
+            <select class="lw" data-width="middleBand"><option>1</option><option>2</option><option>3</option></select>
+            <select data-style="middleBand"><option value="solid">──</option><option value="dashed">– –</option><option value="dotted">···</option></select>
+          </span>
+        </div>
+        <div class="row" data-plot="lowerBand">
+          <span class="lbl"><input type="checkbox" data-vis="lowerBand">Lower Band</span>
+          <span class="ctl">
+            <input type="number" data-value="lowerBand">
+            <input type="color" data-color="lowerBand">
+            <select class="lw" data-width="lowerBand"><option>1</option><option>2</option><option>3</option></select>
+            <select data-style="lowerBand"><option value="solid">──</option><option value="dashed">– –</option><option value="dotted">···</option></select>
+          </span>
+        </div>
+        <div class="row" data-plot="fill">
+          <span class="lbl"><input type="checkbox" data-vis="fill">Background fill (bands)</span>
+          <span class="ctl"><input type="color" data-color="fill">
+            <input type="range" class="opac" min="0" max="1" step="0.01" data-opac="fill"></span>
+        </div>
+
+        <div class="sechead">Bollinger Bands (RSI MA)</div>
+        <div class="row" data-plot="bb">
+          <span class="lbl"><input type="checkbox" data-vis="bb">Bollinger Bands</span>
+          <span class="ctl"><input type="color" data-color="bb">
+            <select class="lw" data-width="bb"><option>1</option><option>2</option><option>3</option></select></span>
+        </div>
+        <div class="row" data-plot="bbFill">
+          <span class="lbl"><input type="checkbox" data-vis="bbFill">BB background fill</span>
+          <span class="ctl"><input type="color" data-color="bbFill">
+            <input type="range" class="opac" min="0" max="1" step="0.01" data-opac="bbFill"></span>
+        </div>
+
+        <div class="sechead">Display</div>
+        <div class="row"><span class="lbl">Precision</span>
+          <span class="ctl"><select id="s_precision">
+            <option value="default">Default</option><option>0</option><option>1</option>
+            <option>2</option><option>3</option><option>4</option><option>5</option>
+          </select></span></div>
+        <div class="row"><span class="lbl"><input type="checkbox" id="s_priceLabels">Labels on price scale</span><span class="ctl"></span></div>
+        <div class="row"><span class="lbl"><input type="checkbox" id="s_statusValues">Values in status line</span><span class="ctl"></span></div>
+      </div>
+
+      <!-- VISIBILITY -->
+      <div class="tabpane" data-pane="visibility">
+        <div class="muted" style="margin-bottom:8px">Show the indicator on these timeframe ranges (mirrors TradingView's Visibility tab).</div>
+        <div id="visRows"></div>
+      </div>
+    </div>
+    <div class="dfoot">
+      <button class="btn" id="btnDefaults">Defaults</button>
+      <span class="spacer"></span>
+      <button class="btn" id="btnCancel">Cancel</button>
+      <button class="btn primary" id="btnOk">Ok</button>
+    </div>
   </div>
 </div>
 
 <script src="rsi.js"></script>
 <script src="data.js"></script>
-<script>
-(function () {
-  const bars = window.DEMO_BARS;
-  const priceCv = document.getElementById('price');
-  const rsiCv = document.getElementById('rsi');
-  const css = getComputedStyle(document.documentElement);
-  const C = (n) => css.getPropertyValue(n).trim();
-
-  const controls = ['length','source','maType','maLength','bbMult','overbought','oversold','showDivergence'];
-  controls.forEach(id => document.getElementById(id).addEventListener('input', render));
-
-  function readOpts() {
-    return {
-      length: +document.getElementById('length').value,
-      source: document.getElementById('source').value,
-      maType: document.getElementById('maType').value,
-      maLength: +document.getElementById('maLength').value,
-      bbMult: +document.getElementById('bbMult').value,
-      overbought: +document.getElementById('overbought').value,
-      oversold: +document.getElementById('oversold').value,
-      middle: 50,
-      showDivergence: document.getElementById('showDivergence').checked,
-    };
-  }
-
-  function fit(cv) {
-    const dpr = window.devicePixelRatio || 1;
-    const w = cv.clientWidth || cv.parentElement.clientWidth;
-    const h = cv.height;
-    cv.width = w * dpr; cv.height = h * dpr;
-    const ctx = cv.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    return { ctx, w, h };
-  }
-
-  function render() {
-    const opts = readOpts();
-    const res = RSI.calculate(bars, opts);
-    drawPrice(res, opts);
-    drawRSI(res, opts);
-    const last = res.rsi.filter(v => !isNaN(v)).slice(-1)[0];
-    document.getElementById('readout').textContent =
-      'RSI(' + opts.length + ') = ' + (last != null ? last.toFixed(2) : '—');
-  }
-
-  const PADL = 8, PADR = 54, PADT = 12, PADB = 18;
-
-  function drawPrice(res, opts) {
-    const { ctx, w, h } = fit(priceCv);
-    ctx.clearRect(0, 0, w, h);
-    const n = bars.length;
-    let hi = -Infinity, lo = Infinity;
-    for (const b of bars) { if (b.high > hi) hi = b.high; if (b.low < lo) lo = b.low; }
-    const pad = (hi - lo) * 0.06; hi += pad; lo -= pad;
-    const x = i => PADL + (i + 0.5) * (w - PADL - PADR) / n;
-    const y = v => PADT + (hi - v) / (hi - lo) * (h - PADT - PADB);
-
-    grid(ctx, w, h, hi, lo, y, v => v.toFixed(4));
-    const cw = Math.max(1.5, (w - PADL - PADR) / n * 0.6);
-    for (let i = 0; i < n; i++) {
-      const b = bars[i]; const up = b.close >= b.open;
-      ctx.strokeStyle = ctx.fillStyle = up ? C('--up') : C('--down');
-      ctx.beginPath(); ctx.moveTo(x(i), y(b.high)); ctx.lineTo(x(i), y(b.low)); ctx.stroke();
-      const yo = y(b.open), yc = y(b.close);
-      ctx.fillRect(x(i) - cw / 2, Math.min(yo, yc), cw, Math.max(1, Math.abs(yc - yo)));
-    }
-    // divergence markers on price lows/highs
-    if (opts.showDivergence) {
-      drawDivLines(ctx, res.divergences.bullish, x, i => y(bars[i].low), C('--os'));
-      drawDivLines(ctx, res.divergences.bearish, x, i => y(bars[i].high), C('--ob'));
-    }
-  }
-
-  function drawRSI(res, opts) {
-    const { ctx, w, h } = fit(rsiCv);
-    ctx.clearRect(0, 0, w, h);
-    const n = bars.length;
-    const hi = 100, lo = 0;
-    const x = i => PADL + (i + 0.5) * (w - PADL - PADR) / n;
-    const y = v => PADT + (hi - v) / (hi - lo) * (h - PADT - PADB);
-
-    // OB/OS shaded zone + fill
-    const yOB = y(opts.overbought), yOS = y(opts.oversold);
-    ctx.fillStyle = 'rgba(120,124,134,0.06)';
-    ctx.fillRect(PADL, yOB, w - PADL - PADR, yOS - yOB);
-
-    // horizontal levels
-    hline(ctx, w, y(opts.overbought), C('--ob'), opts.overbought);
-    hline(ctx, w, y(50), C('--grid'), 50, true);
-    hline(ctx, w, y(opts.oversold), C('--os'), opts.oversold);
-
-    // Bollinger Bands fill
-    if (res.bbUpper) {
-      band(ctx, res.bbUpper, res.bbLower, x, y, 'rgba(41,98,255,0.10)');
-      line(ctx, res.bbUpper, x, y, C('--bb'), 1);
-      line(ctx, res.bbLower, x, y, C('--bb'), 1);
-    }
-    // RSI-based MA
-    if (res.ma) line(ctx, res.ma, x, y, C('--ma'), 1.5);
-    // RSI line
-    line(ctx, res.rsi, x, y, C('--rsi'), 1.75);
-
-    // right-axis labels
-    axisLabels(ctx, w, [ [opts.overbought, C('--ob')], [50, C('--muted')], [opts.oversold, C('--os')] ], y);
-
-    if (opts.showDivergence) {
-      drawDivLines(ctx, res.divergences.bullish, x, i => y(res.rsi[i]), C('--os'));
-      drawDivLines(ctx, res.divergences.bearish, x, i => y(res.rsi[i]), C('--ob'));
-    }
-  }
-
-  function grid(ctx, w, h, hi, lo, y, fmt) {
-    ctx.strokeStyle = C('--grid'); ctx.fillStyle = C('--muted');
-    ctx.lineWidth = 1; ctx.font = '10px sans-serif'; ctx.textBaseline = 'middle';
-    const steps = 5;
-    for (let s = 0; s <= steps; s++) {
-      const v = lo + (hi - lo) * s / steps; const yy = y(v);
-      ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(PADL, yy); ctx.lineTo(w - PADR, yy); ctx.stroke();
-      ctx.globalAlpha = 1; ctx.fillText(fmt(v), w - PADR + 5, yy);
-    }
-  }
-  function hline(ctx, w, yy, color, label, dashed) {
-    ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = 0.55;
-    if (dashed) ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(PADL, yy); ctx.lineTo(w - PADR, yy); ctx.stroke(); ctx.restore();
-  }
-  function axisLabels(ctx, w, pairs, y) {
-    ctx.font = '10px sans-serif'; ctx.textBaseline = 'middle';
-    for (const [v, color] of pairs) { ctx.fillStyle = color; ctx.fillText(String(v), w - PADR + 5, y(v)); }
-  }
-  function line(ctx, arr, x, y, color, lw) {
-    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
-    let started = false;
-    for (let i = 0; i < arr.length; i++) {
-      if (isNaN(arr[i])) { started = false; continue; }
-      const px = x(i), py = y(arr[i]);
-      if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
-    }
-    ctx.stroke();
-  }
-  function band(ctx, up, dn, x, y, fill) {
-    ctx.fillStyle = fill; ctx.beginPath(); let started = false;
-    for (let i = 0; i < up.length; i++) { if (isNaN(up[i])) continue;
-      const px = x(i), py = y(up[i]); if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py); }
-    for (let i = dn.length - 1; i >= 0; i--) { if (isNaN(dn[i])) continue; ctx.lineTo(x(i), y(dn[i])); }
-    ctx.closePath(); ctx.fill();
-  }
-  function drawDivLines(ctx, list, x, yOf, color) {
-    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([4, 2]);
-    for (const d of list) {
-      ctx.beginPath(); ctx.moveTo(x(d.from), yOf(d.from)); ctx.lineTo(x(d.to), yOf(d.to)); ctx.stroke();
-      ctx.setLineDash([]); ctx.fillStyle = color;
-      ctx.beginPath(); ctx.arc(x(d.to), yOf(d.to), 2.5, 0, Math.PI * 2); ctx.fill();
-      ctx.setLineDash([4, 2]);
-    }
-    ctx.restore();
-  }
-
-  window.addEventListener('resize', render);
-  render();
-})();
-</script>
+<script src="settings.js"></script>
+<script src="chart.js"></script>
 </body>
 </html>
